@@ -1,0 +1,12 @@
+# Kubernetes Homelab Hosts Configuration
+# Updated with your specific network configuration
+
+# Master node
+k8s-master-01 192.168.68.86
+
+# Worker nodes
+k8s-worker-01 192.168.68.88
+k8s-worker-02 192.168.68.83
+
+# MetalLB IP Pool (adjust based on your network)
+# 192.168.68.240-192.168.68.250

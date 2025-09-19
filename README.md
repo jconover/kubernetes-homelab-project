@@ -93,4 +93,4 @@ Default network ranges:
 - This setup is for homelab use only
 - Default configurations may not be suitable for production
 - Review and customize security settings as needed
-# kubernetes-homelab-project
+
