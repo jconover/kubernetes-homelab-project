@@ -1,0 +1,47 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: applications
+  namespace: monitoring
+  labels:
+    app: applications
+spec:
+  selector:
+    matchLabels:
+      app: react-frontend
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: python-api
+  namespace: monitoring
+  labels:
+    app: python-api
+spec:
+  selector:
+    matchLabels:
+      app: python-api
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: nodejs-service
+  namespace: monitoring
+  labels:
+    app: nodejs-service
+spec:
+  selector:
+    matchLabels:
+      app: nodejs-service
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s

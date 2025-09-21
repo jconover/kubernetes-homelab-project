@@ -1,0 +1,46 @@
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: homelab-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.68.240-192.168.68.250  # Your network range
+  autoAssign: true
+
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: homelab-l2
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - homelab-pool
+  nodeSelectors:
+  - matchLabels:
+      kubernetes.io/os: linux
+
+---
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: homelab-pool-v6
+  namespace: metallb-system
+spec:
+  addresses:
+  - fd00::240-fd00::250  # IPv6 range (optional)
+  autoAssign: false
+
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: homelab-l2-v6
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - homelab-pool-v6
+  nodeSelectors:
+  - matchLabels:
+      kubernetes.io/os: linux

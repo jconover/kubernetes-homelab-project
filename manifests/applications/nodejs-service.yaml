@@ -1,0 +1,20 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: nodejs-service
+  namespace: argocd
+spec:
+  project: default
+  source:
+    repoURL: https://github.com/jconover/kubernetes-homelab-project
+    targetRevision: HEAD
+    path: manifests/apps/nodejs-service
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: applications
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+    - CreateNamespace=true
