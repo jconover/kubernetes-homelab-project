@@ -32,36 +32,42 @@ if [[ $EUID -ne 0 ]]; then
    error "This script must be run as root"
 fi
 
-# Check if kubectl is available
+# Check if kubectl is available (optional for client-only setup)
 if ! command -v kubectl &> /dev/null; then
-    error "kubectl not found. Please install Kubernetes first."
+    warn "kubectl not found. This script will install Helm client only."
+    warn "Helm repositories will be added but not updated until cluster is ready."
 fi
 
 log "Starting Helm installation..."
 
 # Check if Helm is already installed
 if command -v helm &> /dev/null; then
-    local current_version=$(helm version --template '{{.Version}}' | sed 's/v//')
+    current_version=$(helm version --template '{{.Version}}' | sed 's/v//')
     log "Helm is already installed (version: $current_version)"
     
     # Check if version matches
     if [[ "$current_version" == "$HELM_VERSION" ]]; then
         log "Helm version matches required version ($HELM_VERSION)"
     else
-        warn "Helm version mismatch. Current: $current_version, Required: $HELM_VERSION"
-        read -p "Do you want to upgrade Helm? (y/n): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            log "Upgrading Helm to version $HELM_VERSION..."
+        # Compare versions to see if current is newer
+        if [[ "$current_version" > "$HELM_VERSION" ]]; then
+            log "Helm version is newer than required. Current: $current_version, Required: $HELM_VERSION"
+            log "Using existing Helm installation (newer version is fine)"
         else
-            log "Skipping Helm upgrade"
-            exit 0
+            warn "Helm version is older than required. Current: $current_version, Required: $HELM_VERSION"
+            read -p "Do you want to upgrade Helm? (y/n): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                log "Upgrading Helm to version $HELM_VERSION..."
+            else
+                log "Skipping Helm upgrade"
+                exit 0
+            fi
         fi
     fi
-fi
-
-# Download and install Helm
-log "Downloading Helm version $HELM_VERSION..."
+else
+    # Download and install Helm
+    log "Downloading Helm version $HELM_VERSION..."
 cd /tmp
 
 # Detect architecture
@@ -107,6 +113,7 @@ fi
 
 log "Helm installed successfully!"
 helm version --client
+fi
 
 # Add common Helm repositories
 log "Adding common Helm repositories..."
@@ -135,9 +142,14 @@ helm repo add postgresql https://charts.bitnami.com/bitnami
 # Add Redis repository
 helm repo add redis https://charts.bitnami.com/bitnami
 
-# Update repositories
-log "Updating Helm repositories..."
-helm repo update
+# Update repositories (only if kubectl is available)
+if command -v kubectl &> /dev/null; then
+    log "Updating Helm repositories..."
+    helm repo update
+else
+    warn "Skipping repository update - kubectl not available"
+    warn "Run 'helm repo update' after cluster is ready"
+fi
 
 log "Helm setup completed successfully!"
 log ""
