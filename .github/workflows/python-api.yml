@@ -1,0 +1,173 @@
+name: Python API CI/CD
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'apps/python-api/**'
+      - '.github/workflows/python-api.yml'
+  pull_request:
+    branches: [ main ]
+    paths:
+      - 'apps/python-api/**'
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: jconover/kubernetes-homelab-python-api
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./apps/python-api
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
+        cache-dependency-path: apps/python-api/requirements.txt
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio httpx
+    
+    - name: Run tests
+      run: |
+        # Create a simple test file if it doesn't exist
+        if [ ! -f test_main.py ]; then
+          cat > test_main.py << 'EOF'
+        import pytest
+        from fastapi.testclient import TestClient
+        from main import app
+        
+        client = TestClient(app)
+        
+        def test_root():
+            response = client.get("/")
+            assert response.status_code == 200
+            assert "message" in response.json()
+        
+        def test_health():
+            response = client.get("/health")
+            assert response.status_code == 200
+            assert "status" in response.json()
+        
+        def test_metrics():
+            response = client.get("/metrics")
+            assert response.status_code == 200
+        EOF
+        fi
+        pytest test_main.py -v
+    
+    - name: Lint with flake8
+      run: |
+        pip install flake8
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+  build-and-push:
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/develop'
+    
+    permissions:
+      contents: read
+      packages: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+    
+    - name: Log in to Container Registry
+      uses: docker/login-action@v3
+      with:
+        registry: ${{ env.REGISTRY }}
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Extract metadata
+      id: meta
+      uses: docker/metadata-action@v5
+      with:
+        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+        tags: |
+          type=ref,event=branch
+          type=ref,event=pr
+          type=sha,prefix={{branch}}-
+          type=raw,value=latest,enable={{is_default_branch}}
+    
+    - name: Build and push Docker image
+      uses: docker/build-push-action@v5
+      with:
+        context: ./apps/python-api
+        push: true
+        tags: ${{ steps.meta.outputs.tags }}
+        labels: ${{ steps.meta.outputs.labels }}
+        cache-from: type=gha
+        cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+    
+    - name: Setup kubectl
+      uses: azure/setup-kubectl@v3
+      with:
+        version: 'v1.28.0'
+    
+    - name: Update image tag in manifests
+      run: |
+        # Update the image tag in the deployment manifest
+        sed -i "s|image: ghcr.io/jconover/kubernetes-homelab-python-api:.*|image: ghcr.io/jconover/kubernetes-homelab-python-api:main-$(echo $GITHUB_SHA | cut -c1-7)|g" manifests/apps/python-api/deployment.yaml
+    
+    - name: Commit and push changes
+      run: |
+        git config --local user.email "action@github.com"
+        git config --local user.name "GitHub Action"
+        git add manifests/apps/python-api/deployment.yaml
+        git commit -m "Update Python API image tag to main-$(echo $GITHUB_SHA | cut -c1-7)" || exit 0
+        git push
+    
+    - name: Sync ArgoCD application
+      run: |
+        echo "ArgoCD will automatically sync the application based on the updated manifest"
