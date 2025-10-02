@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
       - name: react-frontend
-        image: ghcr.io/jconover/kubernetes-homelab-react-frontend:latest
+        image: docker.io/jconover/kubernetes-homelab-react-frontend:latest
         ports:
         - containerPort: 80
           name: http

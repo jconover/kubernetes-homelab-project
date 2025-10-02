@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
       - name: nodejs-service
-        image: ghcr.io/jconover/kubernetes-homelab-nodejs-service:latest
+        image: docker.io/jconover/kubernetes-homelab-nodejs-service:latest
         ports:
         - containerPort: 3000
           name: http
