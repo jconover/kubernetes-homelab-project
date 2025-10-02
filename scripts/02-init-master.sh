@@ -13,6 +13,7 @@ NC='\033[0m' # No Color
 
 # Configuration
 CONFIG_FILE="../configs/kubeadm-config.yaml"
+LEGACY_CONFIG_BACKUP="../configs/kubeadm-config.legacy.yaml"
 
 log() {
     echo -e "${GREEN}[$(date +'%Y-%m-%d %H:%M:%S')] $1${NC}"
@@ -34,7 +35,11 @@ fi
 
 # Check if config file exists
 if [[ ! -f "$CONFIG_FILE" ]]; then
-    error "Configuration file not found: $CONFIG_FILE"
+    if [[ -f "${CONFIG_FILE/.yaml/.v1beta4.yaml}" ]]; then
+        CONFIG_FILE="${CONFIG_FILE/.yaml/.v1beta4.yaml}"
+    else
+        error "Configuration file not found: $CONFIG_FILE"
+    fi
 fi
 
 log "Starting Kubernetes master node initialization..."
@@ -74,8 +79,28 @@ fi
 log "Checking kubeadm configuration..."
 if grep -q "kubeadm.k8s.io/v1beta3" "$CONFIG_FILE"; then
     warn "Configuration file uses deprecated API version v1beta3"
-    warn "This is expected and will work fine - the warnings can be ignored"
-    log "Using v1beta3 configuration (deprecated but functional)"
+    warn "Attempting to migrate configuration to v1beta4"
+    if command -v kubeadm &> /dev/null; then
+        if kubeadm config migrate --old-config "$CONFIG_FILE" --new-config "${CONFIG_FILE%.yaml}.v1beta4.yaml" &> /tmp/kubeadm-config-migrate.log; then
+            if [[ -f "$LEGACY_CONFIG_BACKUP" ]]; then
+                warn "Legacy backup $LEGACY_CONFIG_BACKUP already exists; overwriting"
+            fi
+            mv "$CONFIG_FILE" "$LEGACY_CONFIG_BACKUP"
+            CONFIG_FILE="${CONFIG_FILE%.yaml}.v1beta4.yaml"
+            log "Configuration migrated to v1beta4 successfully"
+        else
+            warn "Failed to migrate configuration automatically. See /tmp/kubeadm-config-migrate.log"
+            warn "Proceeding with deprecated configuration; consider running migration manually"
+        fi
+    else
+        warn "kubeadm is not available for migration"
+    fi
+fi
+
+if grep -q "kubeadm.k8s.io/v1beta4" "$CONFIG_FILE"; then
+    log "Using kubeadm configuration API version v1beta4"
+else
+    warn "Using legacy kubeadm configuration; deprecation warnings may appear"
 fi
 
 # Initialize the cluster

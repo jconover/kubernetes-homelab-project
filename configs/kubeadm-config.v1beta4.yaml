@@ -9,17 +9,6 @@ nodeRegistration:
   - name: cgroup-driver
     value: systemd
 ---
-apiVersion: kubeadm.k8s.io/v1beta4
-kind: ClusterConfiguration
-kubernetesVersion: v1.34.0
-controlPlaneEndpoint: 192.168.68.86:6443
-networking:
-  podSubnet: 10.244.0.0/16
-  serviceSubnet: 10.96.0.0/12
-  dnsDomain: cluster.local
-etcd:
-  local:
-    dataDir: /var/lib/etcd
 apiServer:
   certSANs:
   - 192.168.68.86
@@ -29,13 +18,27 @@ apiServer:
   extraArgs:
   - name: advertise-address
     value: 192.168.68.86
+apiVersion: kubeadm.k8s.io/v1beta4
+certificatesDir: /etc/kubernetes/pki
+clusterName: kubernetes
+controlPlaneEndpoint: 192.168.68.86:6443
 controllerManager:
   extraArgs:
   - name: bind-address
     value: 0.0.0.0
+dns: {}
+etcd:
+  local:
+    dataDir: /var/lib/etcd
+imageRepository: registry.k8s.io
+kind: ClusterConfiguration
+kubernetesVersion: v1.34.0
+networking:
+  dnsDomain: cluster.local
+  podSubnet: 10.244.0.0/16
+  serviceSubnet: 10.96.0.0/12
+proxy: {}
 scheduler:
   extraArgs:
   - name: bind-address
     value: 0.0.0.0
-
-
