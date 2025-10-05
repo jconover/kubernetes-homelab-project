@@ -350,7 +350,6 @@ data:
     cluster_formation.k8s.hostname_suffix = .rabbitmq.databases.svc.cluster.local
     cluster_formation.k8s.service_name = rabbitmq
     cluster_formation.k8s.port = 5672
-    cluster_formation.k8s.hostname_cleanup_strategy = long
     
     ## Networking
     listeners.tcp.default = 5672
@@ -391,18 +390,11 @@ data:
     heartbeat = 60
     frame_max = 131072
     
-    ## Queue settings
-    queue_master_locator = min-masters
-    
     ## Cluster settings
     cluster_partition_handling = autoheal
     
     ## Resource limits
     vm_memory_high_watermark_paging_ratio = 0.5
-    
-    ## Message store
-    msg_store_file_size_limit = 16777216
-    msg_store_credit_disc_bound = {4000, 2000}
     
     ## Queue index
     queue_index_embed_msgs_below = 4096
